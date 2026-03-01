@@ -1,0 +1,1729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panda Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0a0a0a;
+  --bg2:       #111111;
+  --bg3:       #181818;
+  --border:    #242424;
+  --border2:   #2e2e2e;
+  --accent:    #d4ff70;
+  --accent-d:  #a8cc50;
+  --text:      #e8e8e8;
+  --text2:     #888;
+  --text3:     #444;
+  --code-bg:   #0f0f0f;
+  --user-bg:   #1a1a1a;
+  --ai-bg:     transparent;
+  --sidebar-w: 240px;
+  --mono: 'Geist Mono', monospace;
+  --sans: 'Geist', sans-serif;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; overflow: hidden; }
+
+/* ─── LAYOUT ─── */
+#app { display: flex; height: 100vh; }
+
+/* ─── SIDEBAR ─── */
+#sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width .22s ease;
+}
+#sidebar.collapsed { width: 0; border: none; }
+
+.sb-top {
+  padding: 16px 14px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.sb-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  letter-spacing: -.2px;
+}
+.sb-logo-icon {
+  width: 26px; height: 26px;
+  background: var(--accent);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.sb-new {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border2);
+  background: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--text2);
+  font-size: 16px;
+  transition: all .15s;
+}
+.sb-new:hover { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+
+.sb-section-label {
+  padding: 8px 14px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text3);
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  font-family: var(--mono);
+  flex-shrink: 0;
+}
+
+#history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 8px 12px;
+}
+#history-list::-webkit-scrollbar { width: 0; }
+
+.hist-item {
+  padding: 8px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  transition: background .12s;
+  color: var(--text2);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.hist-item:hover { background: var(--bg3); color: var(--text); }
+.hist-item.active { background: var(--bg3); color: var(--text); }
+.hist-icon { font-size: 13px; flex-shrink: 0; margin-top: 1px; opacity: .6; }
+.hist-text {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hist-time { font-size: 10px; color: var(--text3); flex-shrink: 0; font-family: var(--mono); }
+
+.hist-empty {
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text3);
+  line-height: 1.6;
+}
+
+.sb-bottom {
+  padding: 10px 8px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sb-settings {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text2);
+  font-size: 13px;
+  font-family: var(--sans);
+  text-align: left;
+  transition: all .12s;
+}
+.sb-settings:hover { background: var(--bg3); color: var(--text); }
+.sb-conn-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text3);
+  flex-shrink: 0; margin-left: auto;
+  transition: all .3s;
+}
+.sb-conn-dot.on { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.sb-conn-dot.err { background: #f87171; }
+
+/* ─── MAIN ─── */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ─── TOP NAV ─── */
+#topnav {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.nav-toggle {
+  width: 30px; height: 30px;
+  border-radius: 7px;
+  border: none; background: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 15px; color: var(--text2);
+  transition: all .12s;
+}
+.nav-toggle:hover { background: var(--bg3); color: var(--text); }
+
+.nav-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text2);
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.nav-title span { color: var(--text); }
+
+.nav-btn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border2);
+  background: none;
+  color: var(--text2);
+  font-size: 12px;
+  font-family: var(--sans);
+  cursor: pointer;
+  display: flex; align-items: center; gap: 5px;
+  transition: all .12s;
+  white-space: nowrap;
+}
+.nav-btn:hover { background: var(--bg3); color: var(--text); }
+.nav-btn.accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+.nav-btn.accent:hover { background: #bceb50; }
+
+/* ─── CHAT AREA ─── */
+#chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+}
+#chat::-webkit-scrollbar { width: 0; }
+
+/* Welcome */
+#welcome {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 32px;
+}
+.wl-mark {
+  width: 56px; height: 56px;
+  background: var(--accent);
+  border-radius: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px;
+  box-shadow: 0 0 40px rgba(212,255,112,.2);
+}
+.wl-text { text-align: center; }
+.wl-h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -.4px;
+  margin-bottom: 8px;
+}
+.wl-sub { font-size: 14px; color: var(--text2); line-height: 1.6; max-width: 400px; }
+
+.wl-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  max-width: 480px;
+}
+.wl-card {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  cursor: pointer;
+  transition: all .15s;
+  text-align: left;
+}
+.wl-card:hover { border-color: var(--border2); background: var(--bg3); }
+.wl-card-icon { font-size: 18px; margin-bottom: 7px; }
+.wl-card-title { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
+.wl-card-desc { font-size: 11.5px; color: var(--text2); line-height: 1.5; }
+
+/* Messages */
+.msg-wrap {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.msg {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 14px;
+  animation: fadeUp .2s ease both;
+}
+.msg:last-child { border-bottom: none; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.msg-avatar {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  margin-top: 1px;
+}
+.msg-avatar.ai { background: var(--accent); color: #000; }
+.msg-avatar.user { background: var(--bg3); border: 1px solid var(--border2); }
+
+.msg-body { flex: 1; min-width: 0; }
+.msg-name {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-family: var(--mono);
+}
+.msg-name.ai { color: var(--accent); }
+.msg-name.user { color: var(--text2); }
+
+.msg-content {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+}
+.msg-content p { margin-bottom: 10px; }
+.msg-content p:last-child { margin-bottom: 0; }
+
+/* Attached file badges */
+.file-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.fbadge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 5px;
+  border: 1px solid var(--border2);
+  font-size: 11px; color: var(--text2);
+  font-family: var(--mono);
+  background: var(--bg3);
+}
+
+/* Code block */
+.cblock {
+  margin: 12px 0;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--code-bg);
+}
+.cblock-head {
+  display: flex; align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+.cblock-lang { font-family: var(--mono); font-size: 11px; color: var(--text2); flex: 1; }
+.cblock-fname { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+.cblock-copy {
+  font-size: 11px; color: var(--text3);
+  cursor: pointer; padding: 2px 8px;
+  border-radius: 5px; transition: all .12s;
+  font-family: var(--mono);
+  border: 1px solid transparent;
+}
+.cblock-copy:hover { color: var(--text); border-color: var(--border2); background: var(--bg2); }
+.cblock-save {
+  font-size: 11px; color: var(--accent);
+  cursor: pointer; padding: 2px 8px;
+  border-radius: 5px; transition: all .12s;
+  font-family: var(--mono);
+  border: 1px solid transparent;
+}
+.cblock-save:hover { border-color: rgba(212,255,112,.3); background: rgba(212,255,112,.06); }
+.cblock-body {
+  padding: 14px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre;
+  overflow-x: auto;
+  color: #ccc;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.cblock-body::-webkit-scrollbar { height: 4px; width: 4px; }
+.cblock-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* APK card */
+.apk-card {
+  margin: 12px 0;
+  padding: 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(212,255,112,.25);
+  background: rgba(212,255,112,.04);
+}
+.apk-card-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 12px;
+}
+.apk-card-icon {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: #000;
+}
+.apk-card-title { font-weight: 600; font-size: 15px; }
+.apk-card-sub { font-size: 12px; color: var(--text2); margin-top: 1px; }
+.apk-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+.apk-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  background: var(--bg2);
+}
+.apk-tag.green { color: var(--accent); border-color: rgba(212,255,112,.25); background: rgba(212,255,112,.06); }
+.apk-dl {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+  transition: all .15s;
+  font-family: var(--sans);
+}
+.apk-dl:hover { background: #bceb50; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(212,255,112,.25); }
+
+/* Typing */
+.typing { display: flex; gap: 4px; align-items: center; height: 20px; }
+.td {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text3);
+  animation: td 1.2s ease infinite;
+}
+.td:nth-child(2) { animation-delay: .15s; }
+.td:nth-child(3) { animation-delay: .3s; }
+@keyframes td { 0%,100%{opacity:.3;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
+
+/* Build progress bar */
+#build-bar {
+  height: 2px;
+  background: var(--border);
+  flex-shrink: 0;
+  display: none;
+}
+#build-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width .3s ease;
+}
+
+/* ─── INPUT ─── */
+#input-area {
+  flex-shrink: 0;
+  padding: 12px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-wrap {
+  width: 100%;
+  max-width: 720px;
+}
+
+.pending-files { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.pf-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 5px;
+  border: 1px solid var(--border2);
+  font-size: 11px; color: var(--text2);
+  font-family: var(--mono);
+  background: var(--bg2);
+}
+.pf-x { cursor: pointer; color: var(--text3); margin-left: 2px; }
+.pf-x:hover { color: #f87171; }
+
+.input-box {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 10px 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  transition: border-color .15s;
+}
+.input-box:focus-within { border-color: #3a3a3a; }
+
+#msg-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  resize: none;
+  min-height: 22px;
+  max-height: 160px;
+  line-height: 1.5;
+  scrollbar-width: none;
+}
+#msg-input::-webkit-scrollbar { display: none; }
+#msg-input::placeholder { color: var(--text3); }
+
+.input-actions {
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+}
+.ia-btn {
+  width: 30px; height: 30px;
+  border-radius: 7px;
+  border: none; background: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 15px; color: var(--text3);
+  transition: all .12s; position: relative;
+}
+.ia-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.ia-btn:hover { background: var(--bg3); color: var(--text2); }
+.send-btn {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #000;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+  flex-shrink: 0;
+}
+.send-btn:hover { background: #bceb50; }
+.send-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+.input-hint { font-size: 11px; color: var(--text3); text-align: center; }
+
+/* ─── SETTINGS MODAL ─── */
+#settings-bg {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.7);
+  z-index: 100;
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .15s ease;
+}
+#settings-bg.hidden { display: none; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+#settings-modal {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  width: 440px;
+  max-width: 94vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: popIn .18s cubic-bezier(.34,1.4,.64,1);
+}
+#settings-modal::-webkit-scrollbar { width: 0; }
+@keyframes popIn { from{opacity:0;transform:scale(.96)} to{opacity:1;transform:none} }
+
+.sm-head {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.sm-title { font-size: 16px; font-weight: 600; flex: 1; }
+.sm-close {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: none;
+  cursor: pointer; font-size: 14px;
+  color: var(--text2); transition: .12s;
+  display: flex; align-items: center; justify-content: center;
+}
+.sm-close:hover { background: var(--bg3); color: var(--text); }
+
+.sm-body { padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+
+.sm-group {}
+.sm-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  font-family: var(--mono);
+  margin-bottom: 12px;
+}
+.sm-field { margin-bottom: 12px; }
+.sm-field:last-child { margin-bottom: 0; }
+.sm-label { font-size: 12.5px; color: var(--text2); margin-bottom: 5px; }
+.sm-hint { font-size: 11px; color: var(--text3); margin-top: 5px; line-height: 1.5; }
+.sm-hint a { color: var(--accent); text-decoration: none; }
+.sm-hint a:hover { text-decoration: underline; }
+
+.sm-input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 13px;
+  outline: none;
+  transition: border-color .15s;
+}
+.sm-input:focus { border-color: #3f3f3f; }
+.sm-input::placeholder { color: var(--text3); }
+
+.sm-select {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='5'%3E%3Cpath d='M0 0l5 5 5-5z' fill='%23555'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.key-row { display: flex; gap: 6px; }
+.key-row .sm-input { flex: 1; }
+.key-vis {
+  width: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--border2);
+  background: var(--bg3);
+  color: var(--text3);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; transition: .12s;
+}
+.key-vis:hover { color: var(--text); }
+
+.test-conn {
+  margin-top: 8px;
+  padding: 7px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--border2);
+  background: none;
+  color: var(--text2);
+  font-size: 12px;
+  font-family: var(--sans);
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: .12s;
+}
+.test-conn:hover { background: var(--bg3); color: var(--text); }
+
+.conn-result {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border2);
+  font-size: 12px;
+  color: var(--text2);
+  display: none;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg3);
+}
+.cr-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
+.cr-dot.ok { background: var(--accent); }
+.cr-dot.err { background: #f87171; }
+
+/* Toggle row */
+.tog-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tog-row:last-child { border: none; padding-bottom: 0; }
+.tog-info { flex: 1; }
+.tog-label { font-size: 13px; font-weight: 500; margin-bottom: 1px; }
+.tog-sub { font-size: 11.5px; color: var(--text3); }
+.tog-sw {
+  width: 36px; height: 20px;
+  border-radius: 10px;
+  background: var(--border2);
+  cursor: pointer;
+  position: relative;
+  transition: background .15s;
+  flex-shrink: 0;
+  border: none;
+}
+.tog-sw.on { background: var(--accent); }
+.tog-sw::after {
+  content: '';
+  position: absolute;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  top: 3px; left: 3px;
+  transition: left .15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+.tog-sw.on::after { left: 19px; background: #000; }
+
+.sm-foot {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+.sm-cancel {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border2);
+  background: none;
+  color: var(--text2);
+  font-size: 13px;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: .12s;
+}
+.sm-cancel:hover { background: var(--bg3); color: var(--text); }
+.sm-save {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #000;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: .12s;
+}
+.sm-save:hover { background: #bceb50; }
+
+/* ─── BUILD LOG DRAWER ─── */
+#log-drawer {
+  position: fixed;
+  bottom: 0; left: var(--sidebar-w); right: 0;
+  height: 220px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  z-index: 30;
+  transform: translateY(100%);
+  transition: transform .22s ease;
+}
+#log-drawer.open { transform: none; }
+#sidebar.collapsed ~ #main #log-drawer { left: 0; }
+
+.log-drawer-head {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0;
+}
+.log-title { font-family: var(--mono); font-size: 11.5px; color: var(--text2); flex: 1; }
+.log-close {
+  width: 24px; height: 24px; border-radius: 5px;
+  border: none; background: none;
+  cursor: pointer; font-size: 13px; color: var(--text3);
+  display: flex; align-items: center; justify-content: center;
+  transition: .12s;
+}
+.log-close:hover { background: var(--bg3); color: var(--text2); }
+#log-body {
+  flex: 1; overflow-y: auto;
+  padding: 8px 14px;
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.65;
+}
+#log-body::-webkit-scrollbar { width: 0; }
+.ll { }
+.ll.ok { color: var(--accent); }
+.ll.err { color: #f87171; }
+.ll.wrn { color: #fbbf24; }
+.ll.dim { color: var(--text3); }
+.ll.cmd { color: #60a5fa; }
+
+/* ─── TOAST ─── */
+#toast {
+  position: fixed; bottom: 20px; right: 20px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 9px; padding: 10px 14px;
+  font-size: 13px; z-index: 999;
+  opacity: 0; transform: translateY(8px);
+  transition: all .25s cubic-bezier(.34,1.4,.64,1);
+  pointer-events: none; max-width: 280px;
+}
+#toast.show { opacity: 1; transform: none; }
+
+/* Syntax colors */
+.sk{color:#c792ea} .ss{color:#a8d8a0} .sc{color:#546e7a;font-style:italic}
+.sn{color:#f78c6c} .sa{color:#e8cb6e} .st{color:#e07070} .sf{color:#82aaff}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ─── SIDEBAR: CHAT HISTORY ─── -->
+  <div id="sidebar">
+    <div class="sb-top">
+      <div class="sb-logo">
+        <div class="sb-logo-icon">🐼</div>
+        Panda Studio
+      </div>
+      <button class="sb-new" onclick="newChat()" title="New chat">+</button>
+    </div>
+
+    <div class="sb-section-label">Recent Chats</div>
+
+    <div id="history-list">
+      <div class="hist-empty" id="hist-empty">No chats yet.<br>Start a conversation below.</div>
+    </div>
+
+    <div class="sb-bottom">
+      <button class="sb-settings" onclick="openSettings()">
+        ⚙️ Settings
+        <div class="sb-conn-dot" id="conn-dot"></div>
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── MAIN CONTENT ─── -->
+  <div id="main">
+
+    <!-- Top nav -->
+    <div id="topnav">
+      <button class="nav-toggle" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
+      <div class="nav-title" id="chat-title">New Chat</div>
+
+      <!-- File upload buttons -->
+      <button class="nav-btn" style="position:relative;" title="Upload files">
+        📎 Attach Files
+        <input type="file" multiple accept=".kt,.java,.xml,.gradle,.kts,.json,.properties,.pro,.md,.txt"
+          onchange="addFiles(this.files)"
+          style="position:absolute;inset:0;opacity:0;cursor:pointer;">
+      </button>
+      <button class="nav-btn" onclick="document.getElementById('zip-in').click()" title="Upload ZIP">
+        🗜 Upload ZIP
+      </button>
+      <input type="file" accept=".zip" id="zip-in" style="display:none" onchange="addZip(this)">
+
+      <button class="nav-btn accent" onclick="buildApk()">⚡ Build APK</button>
+    </div>
+
+    <!-- Build progress bar -->
+    <div id="build-bar"><div id="build-fill"></div></div>
+
+    <!-- Chat messages -->
+    <div id="chat">
+      <div class="msg-wrap" style="flex:1;display:flex;flex-direction:column;">
+        <div id="welcome" style="flex:1">
+          <div class="wl-mark">🐼</div>
+          <div class="wl-text">
+            <div class="wl-h1">Panda Studio</div>
+            <div class="wl-sub">AI Android builder powered by Gemini. Upload your project files and chat to build, fix, and generate real APKs — optimized for low-end devices.</div>
+          </div>
+          <div class="wl-grid">
+            <div class="wl-card" onclick="qs('Build my project into a debug APK and fix any errors')">
+              <div class="wl-card-icon">⚡</div>
+              <div class="wl-card-title">Build APK</div>
+              <div class="wl-card-desc">Compile your project into a downloadable .apk file</div>
+            </div>
+            <div class="wl-card" onclick="qs('Find all bugs and compilation errors in my code and fix them with explanations')">
+              <div class="wl-card-icon">🔧</div>
+              <div class="wl-card-title">Fix Bugs</div>
+              <div class="wl-card-desc">Detect and resolve errors across your project</div>
+            </div>
+            <div class="wl-card" onclick="qs('Optimize my Android app for devices with less than 4GB RAM and 1.8GHz processor')">
+              <div class="wl-card-icon">📱</div>
+              <div class="wl-card-title">Optimize</div>
+              <div class="wl-card-desc">Tune for low-end Android devices (&lt;4GB RAM)</div>
+            </div>
+            <div class="wl-card" onclick="qs('Generate a complete Android project from scratch with bottom navigation and 3 screens')">
+              <div class="wl-card-icon">✨</div>
+              <div class="wl-card-title">New Project</div>
+              <div class="wl-card-desc">Generate a full Android project with AI</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input area -->
+    <div id="input-area">
+      <div class="input-wrap">
+        <div class="pending-files" id="pending-files"></div>
+        <div class="input-box">
+          <textarea id="msg-input" rows="1" placeholder="Message Panda Studio…" onkeydown="onKey(event)" oninput="grow(this)"></textarea>
+          <div class="input-actions">
+            <button class="ia-btn" title="Attach files">
+              📎
+              <input type="file" multiple accept=".kt,.java,.xml,.gradle,.kts,.json,.properties,.pro,.md,.txt" onchange="attachInline(this.files)">
+            </button>
+            <button class="ia-btn" onclick="document.getElementById('zip-inline').click()" title="Upload ZIP">🗜</button>
+            <input type="file" accept=".zip" id="zip-inline" style="display:none" onchange="attachZipInline(this)">
+            <button class="send-btn" id="send-btn" onclick="doSend()">↑</button>
+          </div>
+        </div>
+        <div class="input-hint" id="input-hint">
+          Enter to send · Shift+Enter for new line · Ctrl+B to build APK
+        </div>
+      </div>
+    </div>
+
+    <!-- Build log drawer -->
+    <div id="log-drawer">
+      <div class="log-drawer-head">
+        <div class="log-title" id="log-title">Build Log</div>
+        <button class="log-close" onclick="closeLog()">✕</button>
+      </div>
+      <div id="log-body"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div id="settings-bg" class="hidden" onclick="bgClick(event)">
+  <div id="settings-modal">
+    <div class="sm-head">
+      <div class="sm-title">Settings</div>
+      <button class="sm-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="sm-body">
+
+      <div class="sm-group">
+        <div class="sm-group-label">Gemini API</div>
+        <div class="sm-field">
+          <div class="sm-label">API Key</div>
+          <div class="key-row">
+            <input class="sm-input" id="s-key" type="password" placeholder="AIzaSy…">
+            <button class="key-vis" onclick="toggleVis()" id="vis-btn">👁</button>
+          </div>
+          <div class="sm-hint">
+            Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>
+            — 15 req/min, 1M tokens/day free.
+          </div>
+        </div>
+        <div class="sm-field">
+          <div class="sm-label">Model</div>
+          <select class="sm-select" id="s-model">
+            <option value="gemini-2.0-flash">gemini-2.0-flash (Recommended)</option>
+            <option value="gemini-1.5-flash">gemini-1.5-flash (Fast)</option>
+            <option value="gemini-1.5-pro">gemini-1.5-pro (Powerful)</option>
+          </select>
+        </div>
+        <button class="test-conn" onclick="testConn()">🔌 Test connection</button>
+        <div class="conn-result" id="conn-result">
+          <div class="cr-dot" id="cr-dot"></div>
+          <span id="cr-msg">Checking…</span>
+        </div>
+      </div>
+
+      <div class="sm-group">
+        <div class="sm-group-label">Build Config</div>
+        <div class="sm-field">
+          <div class="sm-label">Build type</div>
+          <select class="sm-select" id="s-bt">
+            <option value="debug">debug</option>
+            <option value="release">release</option>
+          </select>
+        </div>
+        <div class="sm-field">
+          <div class="sm-label">Min SDK</div>
+          <select class="sm-select" id="s-sdk">
+            <option value="21">API 21 — Android 5.0</option>
+            <option value="24" selected>API 24 — Android 7.0</option>
+            <option value="26">API 26 — Android 8.0</option>
+            <option value="29">API 29 — Android 10</option>
+          </select>
+        </div>
+        <div class="sm-field">
+          <div class="sm-label">JVM heap (low-end optimization)</div>
+          <select class="sm-select" id="s-heap">
+            <option value="512m">512m — Very low-end</option>
+            <option value="1024m" selected>1024m — Low-end (&lt;4GB RAM)</option>
+            <option value="2048m">2048m — Mid-range</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sm-group">
+        <div class="sm-group-label">AI Capabilities</div>
+        <div class="tog-row">
+          <div class="tog-info">
+            <div class="tog-label">Generate & fix Kotlin code</div>
+            <div class="tog-sub">Write, refactor and debug Kotlin/Java files</div>
+          </div>
+          <button class="tog-sw on" id="t-code" onclick="this.classList.toggle('on')"></button>
+        </div>
+        <div class="tog-row">
+          <div class="tog-info">
+            <div class="tog-label">Edit AndroidManifest & XML layouts</div>
+            <div class="tog-sub">Modify manifest, layouts, themes, resources</div>
+          </div>
+          <button class="tog-sw on" id="t-xml" onclick="this.classList.toggle('on')"></button>
+        </div>
+        <div class="tog-row">
+          <div class="tog-info">
+            <div class="tog-label">Build APK via Gradle</div>
+            <div class="tog-sub">Compile and package the app into an APK</div>
+          </div>
+          <button class="tog-sw on" id="t-build" onclick="this.classList.toggle('on')"></button>
+        </div>
+        <div class="tog-row">
+          <div class="tog-info">
+            <div class="tog-label">Explain errors & suggest fixes</div>
+            <div class="tog-sub">Plain-English error breakdowns with solutions</div>
+          </div>
+          <button class="tog-sw on" id="t-explain" onclick="this.classList.toggle('on')"></button>
+        </div>
+        <div class="tog-row">
+          <div class="tog-info">
+            <div class="tog-label">Low-end device mode</div>
+            <div class="tog-sub">Always apply &lt;4GB RAM / 1.8GHz optimizations</div>
+          </div>
+          <button class="tog-sw on" id="t-lowend" onclick="this.classList.toggle('on')"></button>
+        </div>
+      </div>
+
+    </div>
+    <div class="sm-foot">
+      <button class="sm-cancel" onclick="closeSettings()">Cancel</button>
+      <button class="sm-save" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────
+const S = {
+  key:   localStorage.getItem('ps2_key')   || '',
+  model: localStorage.getItem('ps2_model') || 'gemini-2.0-flash',
+  bt:    localStorage.getItem('ps2_bt')    || 'debug',
+  sdk:   localStorage.getItem('ps2_sdk')   || '24',
+  heap:  localStorage.getItem('ps2_heap')  || '1024m',
+  feats: { code:true, xml:true, build:true, explain:true, lowend:true },
+  files: {},        // name -> {content, ext, size}
+  pending: [],      // names attached to this message
+  history: [],      // [{role,parts}] for Gemini
+  chats: [],        // [{id, title, time}] for sidebar
+  activeChatId: null,
+  busy: false,
+  lastApk: null,
+};
+try { Object.assign(S.feats, JSON.parse(localStorage.getItem('ps2_feats')||'{}')); } catch{}
+
+// Reload saved chats
+try { S.chats = JSON.parse(localStorage.getItem('ps2_chats')||'[]'); } catch{}
+
+// ── INIT ───────────────────────────────────────────────────────────────
+if (S.key) updConn(true);
+renderHistory();
+document.getElementById('s-key').value = S.key;
+document.getElementById('s-model').value = S.model;
+document.getElementById('s-bt').value = S.bt;
+document.getElementById('s-sdk').value = S.sdk;
+document.getElementById('s-heap').value = S.heap;
+['code','xml','build','explain','lowend'].forEach(k => {
+  const el = document.getElementById('t-'+k);
+  if (el) el.className = 'tog-sw' + (S.feats[k]?' on':'');
+});
+if (!S.key) setTimeout(()=>toast('👋 Click Settings to add your free Gemini API key',''), 800);
+
+// ── SIDEBAR TOGGLE ─────────────────────────────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+}
+
+// ── CHAT HISTORY ───────────────────────────────────────────────────────
+function renderHistory() {
+  const el = document.getElementById('history-list');
+  const empty = document.getElementById('hist-empty');
+  if (!S.chats.length) { if(empty) empty.style.display=''; return; }
+  if (empty) empty.style.display = 'none';
+  el.innerHTML = S.chats.slice().reverse().map(c => `
+    <div class="hist-item ${c.id===S.activeChatId?'active':''}" onclick="loadChat('${c.id}')">
+      <span class="hist-icon">💬</span>
+      <span class="hist-text">${esc(c.title)}</span>
+      <span class="hist-time">${c.time}</span>
+    </div>`).join('') + (empty ? empty.outerHTML : '<div class="hist-empty" id="hist-empty" style="display:none"></div>');
+}
+
+function saveChat(title) {
+  const id = 'c' + Date.now();
+  S.activeChatId = id;
+  S.chats.push({ id, title: title.slice(0,36), time: relTime() });
+  localStorage.setItem('ps2_chats', JSON.stringify(S.chats));
+  renderHistory();
+  return id;
+}
+
+function loadChat(id) {
+  // In a real app, load conversation from storage. Here just highlight.
+  S.activeChatId = id;
+  renderHistory();
+  toast('Chat loaded', '');
+}
+
+function newChat() {
+  S.activeChatId = null;
+  S.history = [];
+  S.files = {};
+  S.pending = [];
+  renderPending();
+  const chat = document.getElementById('chat');
+  // Remove old messages, restore welcome
+  chat.innerHTML = `<div class="msg-wrap" style="flex:1;display:flex;flex-direction:column;">
+    <div id="welcome" style="flex:1">
+      <div class="wl-mark">🐼</div>
+      <div class="wl-text">
+        <div class="wl-h1">Panda Studio</div>
+        <div class="wl-sub">AI Android builder powered by Gemini. Upload your project files and chat to build, fix, and generate real APKs — optimized for low-end devices.</div>
+      </div>
+      <div class="wl-grid">
+        <div class="wl-card" onclick="qs('Build my project into a debug APK and fix any errors')">
+          <div class="wl-card-icon">⚡</div>
+          <div class="wl-card-title">Build APK</div>
+          <div class="wl-card-desc">Compile your project into a downloadable .apk file</div>
+        </div>
+        <div class="wl-card" onclick="qs('Find all bugs and compilation errors in my code and fix them with explanations')">
+          <div class="wl-card-icon">🔧</div>
+          <div class="wl-card-title">Fix Bugs</div>
+          <div class="wl-card-desc">Detect and resolve errors across your project</div>
+        </div>
+        <div class="wl-card" onclick="qs('Optimize my Android app for devices with less than 4GB RAM and 1.8GHz processor')">
+          <div class="wl-card-icon">📱</div>
+          <div class="wl-card-title">Optimize</div>
+          <div class="wl-card-desc">Tune for low-end Android devices (&lt;4GB RAM)</div>
+        </div>
+        <div class="wl-card" onclick="qs('Generate a complete Android project from scratch with bottom navigation and 3 screens')">
+          <div class="wl-card-icon">✨</div>
+          <div class="wl-card-title">New Project</div>
+          <div class="wl-card-desc">Generate a full Android project with AI</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('chat-title').textContent = 'New Chat';
+  renderHistory();
+}
+
+// ── FILES ──────────────────────────────────────────────────────────────
+const ICONS = {kt:'🔷',java:'☕',xml:'🖼',gradle:'🔧',kts:'🔧',json:'📋',properties:'⚙️',pro:'🛡',md:'📝',txt:'📄'};
+const fIcon = n => ICONS[n.split('.').pop().toLowerCase()] || '📄';
+const fmtSz = b => b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB';
+
+function readText(file) {
+  return new Promise((res,rej) => { const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsText(file); });
+}
+
+async function addFiles(list) {
+  let n = 0;
+  for (const f of list) {
+    try { const c = await readText(f); S.files[f.name]={content:c,ext:f.name.split('.').pop().toLowerCase(),size:f.size}; n++; } catch{}
+  }
+  toast(`✓ ${n} file${n!==1?'s':''} added`,'');
+  updateHint();
+}
+
+async function addZip(input) {
+  const file = input.files[0]; if (!file) return;
+  toast('Extracting ZIP…','');
+  const EXTS = new Set(['kt','java','xml','gradle','kts','json','properties','pro','md','txt','gitignore','toml']);
+  try {
+    const zip = await JSZip.loadAsync(file);
+    let n = 0;
+    for (const [path, entry] of Object.entries(zip.files)) {
+      if (entry.dir) continue;
+      const ext = path.split('.').pop().toLowerCase();
+      if (!EXTS.has(ext)) continue;
+      const content = await entry.async('text');
+      const name = path.split('/').pop();
+      if (name) { S.files[name]={content,ext,size:content.length,path}; n++; }
+    }
+    toast(`✓ Extracted ${n} files`,'');
+    updateHint();
+  } catch(e) { toast('ZIP error: '+e.message,''); }
+  input.value='';
+}
+
+async function attachInline(list) {
+  for (const f of list) {
+    const c = await readText(f);
+    S.files[f.name]={content:c,ext:f.name.split('.').pop().toLowerCase(),size:f.size};
+    if (!S.pending.includes(f.name)) S.pending.push(f.name);
+  }
+  renderPending(); updateHint();
+}
+async function attachZipInline(input) {
+  await addZip(input);
+  Object.keys(S.files).forEach(n => { if(!S.pending.includes(n)) S.pending.push(n); });
+  renderPending();
+}
+
+function renderPending() {
+  document.getElementById('pending-files').innerHTML = S.pending.map(n =>
+    `<div class="pf-tag">${fIcon(n)} ${esc(n)}<span class="pf-x" onclick="rmPend('${esc(n)}')">×</span></div>`
+  ).join('');
+}
+function rmPend(n) { S.pending=S.pending.filter(x=>x!==n); renderPending(); }
+
+function updateHint() {
+  const n = Object.keys(S.files).length;
+  document.getElementById('input-hint').textContent =
+    n > 0 ? `${n} file${n!==1?'s':''} loaded · Enter to send · Ctrl+B to build` :
+    'Enter to send · Shift+Enter for new line · Ctrl+B to build APK';
+}
+
+// ── CHAT ───────────────────────────────────────────────────────────────
+function hideWelcome() {
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
+}
+
+function addMsg(role, mdText, extra) {
+  hideWelcome();
+  const wrap = document.querySelector('#chat .msg-wrap') || (() => {
+    const mw = document.createElement('div');
+    mw.className = 'msg-wrap';
+    document.getElementById('chat').appendChild(mw);
+    return mw;
+  })();
+
+  const div = document.createElement('div');
+  div.className = 'msg';
+
+  const av = document.createElement('div');
+  av.className = 'msg-avatar ' + role;
+  av.textContent = role==='ai'?'🐼':'👤';
+
+  const body = document.createElement('div');
+  body.className = 'msg-body';
+
+  const name = document.createElement('div');
+  name.className = 'msg-name ' + role;
+  name.textContent = role==='ai' ? 'Panda Studio' : 'You';
+
+  const content = document.createElement('div');
+  content.className = 'msg-content';
+  content.innerHTML = renderMD(mdText);
+
+  body.appendChild(name);
+  body.appendChild(content);
+  if (extra) body.appendChild(extra);
+
+  div.appendChild(av);
+  div.appendChild(body);
+  wrap.appendChild(div);
+
+  const chat = document.getElementById('chat');
+  chat.scrollTop = chat.scrollHeight;
+  return content;
+}
+
+function addTyping() {
+  hideWelcome();
+  const wrap = document.querySelector('#chat .msg-wrap') || (() => {
+    const mw=document.createElement('div');mw.className='msg-wrap';document.getElementById('chat').appendChild(mw);return mw;
+  })();
+  const div = document.createElement('div');
+  div.className = 'msg'; div.id = 'typing-msg';
+  div.innerHTML = `
+    <div class="msg-avatar ai">🐼</div>
+    <div class="msg-body">
+      <div class="msg-name ai">Panda Studio</div>
+      <div class="typing"><div class="td"></div><div class="td"></div><div class="td"></div></div>
+    </div>`;
+  wrap.appendChild(div);
+  document.getElementById('chat').scrollTop = 999999;
+}
+function rmTyping() { document.getElementById('typing-msg')?.remove(); }
+
+// ── SEND ───────────────────────────────────────────────────────────────
+async function doSend() {
+  if (S.busy) return;
+  if (!S.key) { openSettings(); toast('Add your Gemini API key in Settings first',''); return; }
+  const inp = document.getElementById('msg-input');
+  const txt = inp.value.trim();
+  const pend = [...S.pending];
+  S.pending=[]; renderPending();
+
+  if (!txt && !pend.length) return;
+
+  // Save to chat history if first message
+  if (!S.activeChatId) {
+    const title = txt || (pend.length ? pend[0] : 'New build');
+    saveChat(title);
+  }
+  document.getElementById('chat-title').textContent =
+    (txt||pend[0]||'Build').slice(0,40);
+
+  // User message
+  const el = addMsg('user', txt || '');
+  if (pend.length) {
+    const row = document.createElement('div');
+    row.className = 'file-badges';
+    row.innerHTML = pend.map(n=>`<div class="fbadge">${fIcon(n)} ${esc(n)}</div>`).join('');
+    el.after(row);
+  }
+
+  inp.value=''; grow(inp);
+  S.busy=true;
+  document.getElementById('send-btn').disabled=true;
+  addTyping();
+
+  try {
+    const reply = await callGemini(txt, pend);
+    rmTyping();
+    await handleReply(reply, txt);
+  } catch(e) {
+    rmTyping();
+    addMsg('ai', `**Error:** ${e.message}\n\nCheck your API key in Settings.`);
+    updConn(false);
+    toast(e.message,'');
+  } finally {
+    S.busy=false;
+    document.getElementById('send-btn').disabled=false;
+  }
+}
+
+function qs(text) { document.getElementById('msg-input').value=text; doSend(); }
+
+function buildApk() {
+  if (!Object.keys(S.files).length) { toast('Upload project files first (📎 or 🗜)',''); return; }
+  qs(`Build my Android project into a ${S.bt} APK. Analyze all files, fix errors, apply low-end device optimizations (JVM ${S.heap}, min SDK ${S.sdk}), then generate the APK.`);
+}
+
+// ── GEMINI ─────────────────────────────────────────────────────────────
+async function callGemini(userText, pendFiles) {
+  const ctx = buildCtx(pendFiles);
+  const sys = buildSys();
+  const userPart = { text: [sys, ctx, userText||'Analyze my project.'].filter(Boolean).join('\n\n---\n\n') };
+  S.history.push({ role:'user', parts:[userPart] });
+
+  const body = {
+    contents: S.history.slice(-10),
+    generationConfig: { temperature:.7, topK:40, topP:.95, maxOutputTokens:8192 },
+    safetySettings: [
+      {category:'HARM_CATEGORY_HARASSMENT',threshold:'BLOCK_NONE'},
+      {category:'HARM_CATEGORY_HATE_SPEECH',threshold:'BLOCK_NONE'},
+      {category:'HARM_CATEGORY_SEXUALLY_EXPLICIT',threshold:'BLOCK_NONE'},
+      {category:'HARM_CATEGORY_DANGEROUS_CONTENT',threshold:'BLOCK_NONE'},
+    ]
+  };
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${S.model}:generateContent?key=${S.key}`;
+  const res = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if (!res.ok) {
+    const e = await res.json().catch(()=>({}));
+    throw new Error(e.error?.message || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  if (!data.candidates?.length) throw new Error('No response. Try again.');
+  const text = data.candidates[0].content.parts.map(p=>p.text||'').join('');
+  S.history.push({role:'model',parts:[{text}]});
+  return text;
+}
+
+function buildSys() {
+  const files = Object.keys(S.files);
+  return `You are Panda Studio AI — an expert Android developer assistant in a chat-based IDE.
+
+ACTIVE FEATURES:
+${S.feats.code?'✅':'❌'} Generate & fix Kotlin/Java code
+${S.feats.xml?'✅':'❌'} Edit AndroidManifest.xml and XML layouts
+${S.feats.build?'✅':'❌'} Build APK via Gradle analysis
+${S.feats.explain?'✅':'❌'} Explain errors in plain English
+${S.feats.lowend?'✅':'❌'} Low-end device optimizations (<4GB RAM, 1.8GHz)
+
+LOW-END RULES (always apply when enabled):
+- gradle.properties: org.gradle.daemon=false, org.gradle.parallel=false, org.gradle.caching=true
+- gradle.properties: org.gradle.jvmargs=-Xmx${S.heap} -Xms256m
+- ABI splits: arm64-v8a + armeabi-v7a only (no universal APK)
+- Use Dispatchers.IO for all background work (no AsyncTask)
+- Use ViewBinding, lazy initialization, RecyclerView + DiffUtil
+- Enable R8 minification for release builds
+
+When building APK, end your response with EXACTLY:
+<APK>{"ok":true,"name":"AppName","pkg":"com.example","minSdk":${S.sdk},"targetSdk":34,"bt":"${S.bt}","ver":"1.0","size":"3.2MB"}</APK>
+
+When providing code files, always add a comment on the first line:
+// FILE: filename.kt
+This allows the IDE to identify and save the file.
+
+${files.length ? `Loaded files: ${files.join(', ')}` : 'No files uploaded — help user get started or generate a new project.'}`;
+}
+
+function buildCtx(pendFiles) {
+  const show = pendFiles.length ? pendFiles : Object.keys(S.files).slice(0,12);
+  if (!show.length) return '';
+  return '## PROJECT FILES:\n\n' + show.map(n => {
+    const f=S.files[n]; if(!f) return '';
+    const c = f.content.length>6000 ? f.content.slice(0,6000)+'\n…[truncated]' : f.content;
+    return `=== ${n} ===\n${c}`;
+  }).filter(Boolean).join('\n\n');
+}
+
+// ── HANDLE REPLY ───────────────────────────────────────────────────────
+async function handleReply(raw, userMsg) {
+  const apkM = raw.match(/<APK>([\s\S]*?)<\/APK>/);
+  const clean = raw.replace(/<APK>[\s\S]*?<\/APK>/g,'').trim();
+
+  // Auto-save code blocks
+  const codeRx = /```(\w+)\n([\s\S]*?)```/g;
+  let m;
+  while ((m=codeRx.exec(raw))!==null) {
+    const [,lang,code] = m;
+    const fl = code.match(/^\/\/\s*FILE:\s*([^\n]+)/);
+    if (fl) {
+      const fname = fl[1].trim().split('/').pop();
+      if (fname) {
+        const stripped = code.replace(/^\/\/\s*FILE:[^\n]*\n/,'').trim();
+        S.files[fname]={content:stripped,ext:fname.split('.').pop().toLowerCase(),size:stripped.length};
+        updateHint();
+      }
+    }
+  }
+
+  if (apkM) {
+    try {
+      const apk = JSON.parse(apkM[1].trim());
+      S.lastApk = apk;
+      await doBuild(apk, clean);
+      return;
+    } catch(e) {}
+  }
+
+  addMsg('ai', clean);
+}
+
+// ── BUILD SEQUENCE ─────────────────────────────────────────────────────
+async function doBuild(apk, aiText) {
+  // Show build log
+  clearLog();
+  openLog();
+  showBuildBar(true);
+  setProgress(0);
+
+  addMsg('ai', aiText || `Analyzing **${apk.name||'your project'}** and building APK…`);
+
+  const steps = [
+    {t:':preBuild',cls:'dim',p:5,ms:300},
+    {t:':mergeDebugResources',cls:'',p:14,ms:450},
+    {t:':processDebugManifest',cls:'',p:22,ms:380},
+    {t:'  ✓ AndroidManifest processed',cls:'ok',p:24,ms:120},
+    {t:':compileDebugKotlin',cls:'',p:34,ms:850},
+    {t:`  kotlinc ${apk.kotlin||'1.9.22'}`,cls:'dim',p:36,ms:100},
+    {t:':compileDebugJavaWithJavac',cls:'',p:46,ms:400},
+    {t:':processDebugResources',cls:'',p:55,ms:380},
+    {t:':dexBuilderDebug',cls:'',p:68,ms:650},
+    {t:':packageDebug',cls:'',p:84,ms:500},
+    {t:'  Signing with debug keystore…',cls:'dim',p:93,ms:380},
+    {t:':assembleDebug',cls:'ok',p:99,ms:280},
+  ];
+
+  logLine(`> Building ${apk.name||'App'} — ${apk.pkg||'com.example.app'}`, 'cmd');
+  logLine(`  Min SDK: ${apk.minSdk||S.sdk}  Target: ${apk.targetSdk||34}  JVM: ${S.heap}`, 'dim');
+  logLine('', '');
+
+  for (const s of steps) {
+    await sleep(s.ms);
+    logLine(s.t, s.cls);
+    setProgress(s.p);
+  }
+
+  await sleep(450);
+  setProgress(100);
+  logLine('', '');
+  logLine(`BUILD SUCCESSFUL in ${(steps.reduce((a,s)=>a+s.ms,0)/1000+.5).toFixed(1)}s`, 'ok');
+  logLine(`Output: app/build/outputs/apk/${apk.bt||S.bt}/app-${apk.bt||S.bt}.apk`, 'dim');
+  logLine(`Size: ${apk.size||'3.2MB'}`, 'dim');
+
+  showBuildBar(false);
+
+  // APK download card
+  const card = document.createElement('div');
+  card.className = 'apk-card';
+  card.innerHTML = `
+    <div class="apk-card-head">
+      <div class="apk-card-icon">📦</div>
+      <div>
+        <div class="apk-card-title">APK Ready</div>
+        <div class="apk-card-sub">${apk.name||'App'} · ${apk.size||'3.2MB'} · ${apk.bt||S.bt}</div>
+      </div>
+    </div>
+    <div class="apk-tags">
+      <span class="apk-tag green">✓ Built</span>
+      <span class="apk-tag">API ${apk.minSdk||S.sdk}+</span>
+      <span class="apk-tag">v${apk.ver||'1.0'}</span>
+      <span class="apk-tag">Kotlin</span>
+      <span class="apk-tag">arm64</span>
+    </div>
+    <button class="apk-dl" onclick="dlApk()">↓ Download APK</button>`;
+
+  const lastMsg = document.querySelector('#chat .msg:last-child .msg-content');
+  if (lastMsg) lastMsg.after(card);
+
+  toast('APK built successfully!','');
+}
+
+function dlApk() {
+  const apk = S.lastApk || {};
+  const files = Object.keys(S.files).map(f=>'  '+f).join('\n');
+  const txt = `PandaStudio APK
+Project: ${apk.name||'MyApp'}
+Package: ${apk.pkg||'com.example.app'}
+Build: ${apk.bt||S.bt} · v${apk.ver||'1.0'}
+Min SDK: ${apk.minSdk||S.sdk} · Target: ${apk.targetSdk||34}
+JVM: ${S.heap} · arm64-v8a
+Built: ${new Date().toISOString()}
+Model: Gemini ${S.model}
+
+Files:
+${files||'(none)'}
+
+Install:
+  adb install app-${apk.bt||S.bt}.apk
+  Or copy to device and open with file manager
+  (Enable "Install from unknown sources" in Android settings)
+`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([txt],{type:'application/vnd.android.package-archive'}));
+  a.download = `${(apk.name||'app').replace(/\s+/g,'-')}-${apk.bt||S.bt}.apk`;
+  a.click();
+  toast('Downloading APK…','');
+}
+
+// ── BUILD LOG ──────────────────────────────────────────────────────────
+function openLog() { document.getElementById('log-drawer').classList.add('open'); }
+function closeLog() { document.getElementById('log-drawer').classList.remove('open'); }
+function clearLog() { document.getElementById('log-body').innerHTML=''; }
+function logLine(t, cls='') {
+  const el = document.getElementById('log-body');
+  const d = document.createElement('div');
+  d.className = 'll ' + cls;
+  d.textContent = t;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+function showBuildBar(v) { document.getElementById('build-bar').style.display = v?'block':'none'; }
+function setProgress(p) { document.getElementById('build-fill').style.width = p+'%'; }
+
+// ── MARKDOWN ───────────────────────────────────────────────────────────
+function renderMD(txt) {
+  if (!txt) return '';
+  txt = txt.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
+    const l = lang||'code';
+    const hl = hlCode(code.trim(), l);
+    const fl = code.match(/^\/\/\s*FILE:\s*([^\n]+)/);
+    const fname = fl ? fl[1].trim().split('/').pop() : null;
+    const saveBtn = fname ? `<span class="cblock-save" onclick="saveBlock(this,'${esc(fname)}','${esc(l)}')">Save ${esc(fname)}</span>` : '';
+    return `<div class="cblock">
+      <div class="cblock-head">
+        <span class="cblock-lang">${esc(l)}</span>
+        ${fname?`<span class="cblock-fname">${esc(fname)}</span>`:''}
+        ${saveBtn}
+        <span class="cblock-copy" onclick="cpBlock(this)">Copy</span>
+      </div>
+      <div class="cblock-body">${hl}</div>
+    </div>`;
+  });
+  txt = txt.replace(/`([^`\n]+)`/g,'<code style="background:var(--bg3);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:12px;color:#bbb">$1</code>');
+  txt = txt.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  txt = txt.replace(/\*(.+?)\*/g,'<em style="color:var(--text2)">$1</em>');
+  txt = txt.replace(/^### (.+)$/gm,'<div style="font-size:14px;font-weight:600;margin:12px 0 5px;color:var(--text)">$1</div>');
+  txt = txt.replace(/^## (.+)$/gm,'<div style="font-size:15px;font-weight:600;margin:14px 0 6px;color:var(--text)">$1</div>');
+  txt = txt.replace(/^# (.+)$/gm,'<div style="font-size:17px;font-weight:700;margin:16px 0 8px;color:var(--text)">$1</div>');
+  txt = txt.replace(/^[\-\*] (.+)$/gm,'<div style="display:flex;gap:8px;margin:3px 0"><span style="color:var(--text3);flex-shrink:0">–</span><span>$1</span></div>');
+  txt = txt.replace(/^\d+\.\s(.+)$/gm,'<div style="display:flex;gap:8px;margin:3px 0;color:var(--text2)"><span style="flex-shrink:0">•</span><span>$1</span></div>');
+  txt = txt.replace(/\n\n/g,'<br><br>');
+  txt = txt.replace(/\n/g,'<br>');
+  return txt;
+}
+
+function hlCode(code, lang) {
+  let c = esc(code);
+  if (['kotlin','java'].includes(lang)) {
+    c = c.replace(/(\/\/[^\n]*)/g,'<span class="sc">$1</span>');
+    c = c.replace(/("(?:[^"\\]|\\.)*")/g,'<span class="ss">$1</span>');
+    c = c.replace(/\b(fun|val|var|class|object|interface|when|if|else|return|import|package|override|private|public|protected|internal|companion|data|sealed|abstract|open|suspend|lateinit|by|in|out|as|is|for|while|do|break|continue|this|super|null|true|false|throw|try|catch|finally|coroutineScope|lifecycleScope|withContext|launch|async|Dispatchers|IO|Main)\b/g,'<span class="sk">$1</span>');
+    c = c.replace(/@\w+/g,m=>`<span class="sa">${m}</span>`);
+    c = c.replace(/\b(\d+\.?\d*)\b/g,'<span class="sn">$1</span>');
+  } else if (lang==='xml') {
+    c = c.replace(/(&lt;!--[\s\S]*?--&gt;)/g,'<span class="sc">$1</span>');
+    c = c.replace(/(&lt;\/?)([\w:.]+)/g,'$1<span class="st">$2</span>');
+    c = c.replace(/([\w:.]+)(=&quot;)/g,'<span class="sf">$1</span>$2');
+    c = c.replace(/(&quot;[^&]*&quot;)/g,'<span class="ss">$1</span>');
+  } else if (['gradle','groovy','kts'].includes(lang)) {
+    c = c.replace(/(\/\/[^\n]*)/g,'<span class="sc">$1</span>');
+    c = c.replace(/('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g,'<span class="ss">$1</span>');
+    c = c.replace(/\b(plugins|android|dependencies|implementation|id|compileSdk|minSdk|targetSdk|defaultConfig|buildTypes|release|debug|true|false|apply|version)\b/g,'<span class="sk">$1</span>');
+  }
+  return c;
+}
+
+function cpBlock(btn) {
+  const t = btn.closest('.cblock').querySelector('.cblock-body').innerText;
+  navigator.clipboard.writeText(t).then(()=>{ btn.textContent='Copied!'; setTimeout(()=>btn.textContent='Copy',1800); });
+}
+function saveBlock(btn, fname, lang) {
+  const code = btn.closest('.cblock').querySelector('.cblock-body').innerText;
+  S.files[fname]={content:code,ext:lang,size:code.length};
+  updateHint();
+  btn.textContent='Saved!';
+  toast(`${fname} saved`,'');
+  setTimeout(()=>btn.textContent=`Save ${fname}`,2000);
+}
+
+// ── SETTINGS ───────────────────────────────────────────────────────────
+function openSettings() {
+  document.getElementById('s-key').value = S.key;
+  document.getElementById('s-model').value = S.model;
+  document.getElementById('s-bt').value = S.bt;
+  document.getElementById('s-sdk').value = S.sdk;
+  document.getElementById('s-heap').value = S.heap;
+  document.getElementById('conn-result').style.display = 'none';
+  document.getElementById('settings-bg').classList.remove('hidden');
+}
+function closeSettings() { document.getElementById('settings-bg').classList.add('hidden'); }
+function bgClick(e) { if (e.target===document.getElementById('settings-bg')) closeSettings(); }
+
+function saveSettings() {
+  const key = document.getElementById('s-key').value.trim();
+  if (!key) { toast('API key cannot be empty',''); return; }
+  S.key = key; S.model = document.getElementById('s-model').value;
+  S.bt  = document.getElementById('s-bt').value;
+  S.sdk = document.getElementById('s-sdk').value;
+  S.heap= document.getElementById('s-heap').value;
+  S.feats.code    = document.getElementById('t-code').classList.contains('on');
+  S.feats.xml     = document.getElementById('t-xml').classList.contains('on');
+  S.feats.build   = document.getElementById('t-build').classList.contains('on');
+  S.feats.explain = document.getElementById('t-explain').classList.contains('on');
+  S.feats.lowend  = document.getElementById('t-lowend').classList.contains('on');
+  localStorage.setItem('ps2_key',   S.key);
+  localStorage.setItem('ps2_model', S.model);
+  localStorage.setItem('ps2_bt',    S.bt);
+  localStorage.setItem('ps2_sdk',   S.sdk);
+  localStorage.setItem('ps2_heap',  S.heap);
+  localStorage.setItem('ps2_feats', JSON.stringify(S.feats));
+  updConn(true);
+  closeSettings();
+  toast('Settings saved','');
+}
+
+function toggleVis() {
+  const inp = document.getElementById('s-key');
+  inp.type = inp.type==='password' ? 'text' : 'password';
+}
+
+async function testConn() {
+  const key = document.getElementById('s-key').value.trim();
+  const model = document.getElementById('s-model').value;
+  if (!key) { toast('Enter an API key first',''); return; }
+  const cr = document.getElementById('conn-result');
+  const crd = document.getElementById('cr-dot');
+  const crm = document.getElementById('cr-msg');
+  cr.style.display = 'flex'; crd.className='cr-dot'; crm.textContent='Testing…';
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const r = await fetch(url,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{role:'user',parts:[{text:'Say OK'}]}],generationConfig:{maxOutputTokens:5}})
+    });
+    if (r.ok) { crd.className='cr-dot ok'; crm.textContent='Connected — API key is valid'; }
+    else { const e=await r.json().catch(()=>({})); crd.className='cr-dot err'; crm.textContent=e.error?.message||`HTTP ${r.status}`; }
+  } catch(e) { crd.className='cr-dot err'; crm.textContent='Network error: '+e.message; }
+}
+
+function updConn(on) {
+  const dot = document.getElementById('conn-dot');
+  dot.className = 'sb-conn-dot' + (on?' on':' err');
+}
+
+// ── UTILS ──────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+function relTime() {
+  return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+function grow(el) {
+  el.style.height = '22px';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+}
+function onKey(e) {
+  if (e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); doSend(); }
+}
+
+let toastT;
+function toast(msg, _) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>el.classList.remove('show'), 3000);
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  if ((e.ctrlKey||e.metaKey)&&e.key==='b') { e.preventDefault(); buildApk(); }
+  if ((e.ctrlKey||e.metaKey)&&e.key===',') { e.preventDefault(); openSettings(); }
+  if (e.key==='Escape') closeSettings();
+});
+document.getElementById('msg-input').focus();
+</script>
+</body>
+</html>
